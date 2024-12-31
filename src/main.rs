@@ -1,7 +1,6 @@
 use serde_json::json;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use serde;
 
 // Query to use in request
 const QUERY: &str = "
@@ -136,20 +135,22 @@ fn handle_response(
     let has_next_page = &data["pageInfo"]["hasNextPage"].as_bool().unwrap_or(false);
     let media = data["media"].as_array().map(|arr| {
         let anime_metadata_vec: Vec<AnimeMetadata> = arr
-            .into_iter()
+            .iter()
             .map(|val| {
                 let anime_metadata: Result<AnimeMetadata, _> = serde_json::from_value(val.clone());
                 anime_metadata.unwrap()
             })
             .collect();
         anime_metadata_vec
-    }).unwrap_or_else(|| Vec::new());
+    }).unwrap_or_default();
     (media, *has_next_page)
 }
 
 #[tokio::main]
 async fn main() {
-    let result = fire_request(1, "ANIME", 2024).await.map(handle_response);
+    let result = fire_request(1, "ANIME", 2024)
+        .await
+        .map(handle_response);
     match result {
         Ok((media, has_next_page)) => {
             println!("{:?}", media);
