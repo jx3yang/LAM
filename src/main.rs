@@ -1,6 +1,8 @@
-use lam::downloader::Downloader;
+use lam::{downloader::Downloader, types::AnimeMetadata};
 use lam::db_loader::DbLoader;
 use sqlx::{migrate::MigrateDatabase, Connection, Error, Sqlite, SqliteConnection};
+use tokio::sync::mpsc;
+use tokio::task;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -12,24 +14,27 @@ async fn main() -> Result<(), Error> {
           Err(error) => panic!("error: {}", error),
       }
   }
-  let mut conn = SqliteConnection::connect(database_url).await?;
-  let result = Downloader::fire_request(1, "ANIME", 2024)
-      .await
-      .map(Downloader::handle_response);
-  match result {
-      Ok((media, has_next_page)) => {
-          // println!("{:?}", media);
+  let conn = SqliteConnection::connect(database_url).await?;
+  let (sender, receiver) = mpsc::channel::<Option<Vec<AnimeMetadata>>>(4);
+  let mut downloader = Downloader::new(sender);
+  let mut db_loader = DbLoader::new(receiver, conn);
 
-          // println!("{}", has_next_page);
-          DbLoader::create_table_if_not_exists(&mut conn).await?;
-          println!("finished creating");
-          DbLoader::load_metadata(&mut conn, media).await?;
-          println!("finished loading");
-          Ok(())
-      },
-      Err(_) => {
-        println!("Error");
-        Ok(())
-      },
+  let downloader_handle = task::spawn(async move {
+    downloader.download().await
+  });
+
+  let loader_handle = task::spawn(async move {
+    db_loader.load().await
+  });
+
+  let results = tokio::try_join!(
+    downloader_handle,
+    loader_handle,
+  );
+  if results.is_err() {
+    eprintln!("{:?}", results);
   }
+
+  Ok(())
+
 }

@@ -1,5 +1,7 @@
 use serde_json::json;
 use reqwest::Client;
+use tokio::sync::mpsc;
+use tokio::time::{sleep, Duration};
 
 use crate::types::AnimeMetadata;
 
@@ -87,9 +89,51 @@ query (
 }
 ";
 
-pub struct Downloader {}
+pub struct Downloader {
+    sender: mpsc::Sender<Option<Vec<AnimeMetadata>>>,
+}
 
 impl Downloader {
+    pub fn new(sender: mpsc::Sender<Option<Vec<AnimeMetadata>>>) -> Self {
+        Self { sender }
+    }
+
+    pub async fn download(&mut self) -> Result<bool, reqwest::Error> {
+        let mut page = 1;
+        let mut season_year = 2024;
+        let media_type = "ANIME";
+        let mut has_next_page = true;
+
+        while season_year > 1999 || has_next_page {
+            let response = Downloader::fire_request(page, media_type, season_year)
+                .await
+                .map(Downloader::handle_response);
+            match response {
+                Ok((media, new_has_next_page)) => {
+                    println!("Finished downloading season {} page {}", season_year, page);
+                    has_next_page = new_has_next_page;
+                    let send_response = self.sender.send(Some(media)).await;
+                    if send_response.is_err() {
+                        println!("{:?}", send_response.unwrap_err());
+                        eprintln!("Failed to push data to the queue");
+                        return Ok(false);
+                    }
+                    println!("Sent season {} page {}", season_year, page);
+
+                    page += 1;
+                    if !has_next_page {
+                        season_year -= 1;
+                        page = 1;
+                    }
+                    sleep(Duration::from_secs(1)).await;
+                },
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(true)
+    }
+
     pub async fn fire_request(
         page: i32,
         media_type: &str,
