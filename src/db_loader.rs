@@ -21,6 +21,9 @@ impl DbLoader {
                     println!("Received!");
                     match maybe_media {
                         Some(media) => {
+                            if media.is_empty() {
+                                continue;
+                            }
                             let response = DbLoader::load_metadata(&mut self.conn, media).await;
                             if response.is_err() {
                                 println!("{:?}", response.unwrap_err());
@@ -39,11 +42,11 @@ impl DbLoader {
             CREATE TABLE IF NOT EXISTS anime_metadata (
                 id INTEGER PRIMARY KEY,
                 title TEXT NOT NULL,
-                season TEXT NOT NULL,
+                season TEXT,
                 season_year INTEGER NOT NULL,
-                description TEXT NOT NULL,
-                popularity INTEGER NOT NULL,
-                mean_score INTGER NOT NULL
+                description TEXT,
+                popularity INTEGER,
+                mean_score INTEGER
             );
         ";
         sqlx::query(sql).execute(conn).await?;

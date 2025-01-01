@@ -9,13 +9,13 @@ pub struct Title {
 pub struct AnimeMetadata {
     pub id: i32,
     pub title: Title,
-    pub season: String,
+    pub season: Option<String>,
 
     #[serde(rename = "seasonYear")]
     pub season_year: i32,
-    pub description: String,
-    pub popularity: i32,
+    pub description: Option<String>,
+    pub popularity: Option<i32>,
 
     #[serde(rename = "meanScore")]
-    pub mean_score: i32,
+    pub mean_score: Option<i32>,
 }

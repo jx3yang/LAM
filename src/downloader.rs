@@ -100,7 +100,7 @@ impl Downloader {
 
     pub async fn download(&mut self) -> Result<bool, reqwest::Error> {
         let mut page = 1;
-        let mut season_year = 2024;
+        let mut season_year = 2025;
         let media_type = "ANIME";
         let mut has_next_page = true;
 
@@ -173,6 +173,10 @@ impl Downloader {
                 .collect();
             anime_metadata_vec
         }).unwrap_or_default();
+        if media.is_empty() {
+            println!("{:#}", response);
+            println!("Empty list, something is wrong!");
+        }
         (media, *has_next_page)
     }
 }
