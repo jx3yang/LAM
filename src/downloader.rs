@@ -163,9 +163,12 @@ impl Downloader {
         let media = data["media"].as_array().map(|arr| {
             let anime_metadata_vec: Vec<AnimeMetadata> = arr
                 .iter()
-                .map(|val| {
-                    let anime_metadata: Result<AnimeMetadata, _> = serde_json::from_value(val.clone());
-                    anime_metadata.unwrap()
+                .filter_map(|val| {
+                    let anime_metadata: Option<AnimeMetadata> = match serde_json::from_value(val.clone()) {
+                        Ok(anime_metadata) => Some(anime_metadata),
+                        Err(_) => None,
+                    };
+                    anime_metadata
                 })
                 .collect();
             anime_metadata_vec
