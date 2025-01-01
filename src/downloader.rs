@@ -125,7 +125,7 @@ impl Downloader {
                         season_year -= 1;
                         page = 1;
                     }
-                    sleep(Duration::from_secs(1)).await;
+                    sleep(Duration::from_secs(2)).await;
                 },
                 Err(e) => return Err(e),
             }
@@ -139,20 +139,27 @@ impl Downloader {
         media_type: &str,
         season_year: i32,
     ) -> Result<serde_json::Value, reqwest::Error> {
-        let client = Client::new();
-        let json = json!({"query": QUERY, "variables": {"page": page, "type": media_type, "seasonYear": season_year}});
-        let response = client.post("https://graphql.anilist.co/")
-            .header("Content-Type", "application/json")
-            .header("Accept", "application/json")
-            .body(json.to_string())
-            .send()
-            .await
-            .unwrap();
-    
-        // println!("{}", response.headers()["x-ratelimit-remaining"].to_str().unwrap());
-        response.text()
-            .await
-            .map(|response| serde_json::from_str(&response).unwrap())
+        loop {
+            let client = Client::new();
+            let json = json!({"query": QUERY, "variables": {"page": page, "type": media_type, "seasonYear": season_year}});
+            let response = client.post("https://graphql.anilist.co/")
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .body(json.to_string())
+                .send()
+                .await
+                .unwrap();
+        
+            if response.status() == 429 {
+                println!("{}", response.headers()["x-ratelimit-remaining"].to_str().unwrap());
+                println!("Hit limit, sleeping for 10 seconds");
+                sleep(Duration::from_secs(10)).await;
+                continue;
+            }
+            return response.text()
+                .await
+                .map(|response| serde_json::from_str(&response).unwrap());
+        }
     }
 
     pub fn handle_response(
