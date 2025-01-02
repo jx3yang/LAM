@@ -47,7 +47,8 @@ impl DbLoader {
                 season_year INTEGER NOT NULL,
                 description TEXT,
                 popularity INTEGER,
-                mean_score INTEGER
+                mean_score INTEGER,
+                genres TEXT
             );
         ";
         sqlx::query(sql).execute(conn).await?;
@@ -56,7 +57,7 @@ impl DbLoader {
 
     pub async fn load_metadata(conn: &mut SqliteConnection, media: Vec<AnimeMetadata>) -> Result<()> {
         let insert_sql = "
-            INSERT OR REPLACE INTO anime_metadata (id, romaji_title, english_title, season, season_year, description, popularity, mean_score)
+            INSERT OR REPLACE INTO anime_metadata (id, romaji_title, english_title, season, season_year, description, popularity, mean_score, genres)
         ";
         let mut query = sqlx::QueryBuilder::new(insert_sql);
         query.push_values(media, |mut b, anime| {
@@ -67,7 +68,8 @@ impl DbLoader {
                 .push_bind(anime.season_year)
                 .push_bind(anime.description.clone())
                 .push_bind(anime.popularity)
-                .push_bind(anime.mean_score);
+                .push_bind(anime.mean_score)
+                .push_bind(anime.genres.unwrap_or_default().join(","));
         });
         let built_query = query.build();
         // println!("{}", built_query.sql());

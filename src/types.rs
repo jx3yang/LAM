@@ -19,4 +19,6 @@ pub struct AnimeMetadata {
 
     #[serde(rename = "meanScore")]
     pub mean_score: Option<i32>,
+
+    pub genres: Option<Vec<String>>,
 }

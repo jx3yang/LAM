@@ -85,6 +85,7 @@ query (
       description
       popularity
       meanScore
+      genres
     }
   }
 }
