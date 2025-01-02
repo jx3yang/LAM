@@ -22,3 +22,19 @@ pub struct AnimeMetadata {
 
     pub genres: Option<Vec<String>>,
 }
+
+#[derive(sqlx::FromRow, Debug)]
+pub struct AnimeMetadataRow {
+    pub id: i32,
+    pub english_title: Option<String>,
+    pub romaji_title: Option<String>,
+    pub season: Option<String>,
+
+    pub season_year: i32,
+    pub description: Option<String>,
+    pub popularity: Option<i32>,
+
+    pub mean_score: Option<i32>,
+
+    pub genres: Option<String>,
+}
