@@ -141,7 +141,14 @@ impl Downloader {
         media_type: &str,
         season_year: i32,
     ) -> Result<serde_json::Value, reqwest::Error> {
+        let mut retry = -1;
         loop {
+            retry += 1;
+            if retry == 3 {
+                println!("Tried 3 times, skip to next request...");
+                return Ok(serde_json::Value::Null);
+            }
+
             let client = Client::new();
             let json = json!({"query": QUERY, "variables": {"page": page, "type": media_type, "seasonYear": season_year}});
             let response = client.post("https://graphql.anilist.co/")
@@ -155,6 +162,13 @@ impl Downloader {
             if response.status() == 429 {
                 println!("{}", response.headers()["x-ratelimit-remaining"].to_str().unwrap());
                 println!("Hit limit, sleeping for 10 seconds");
+                sleep(Duration::from_secs(10)).await;
+                continue;
+            }
+
+            if response.status() != 200 {
+                println!("Got the following: {}", response.status());
+                println!("Sleeping for 10 seconds");
                 sleep(Duration::from_secs(10)).await;
                 continue;
             }
