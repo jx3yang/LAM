@@ -38,3 +38,11 @@ pub struct AnimeMetadataRow {
 
     pub genres: Option<String>,
 }
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct AnimeSummary {
+    pub id: i32,
+    pub summary: String,
+    pub generated_genres: Vec<String>,
+    pub generated_themes: Vec<String>,
+}

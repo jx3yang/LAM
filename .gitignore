@@ -1,4 +1,4 @@
 target/
-anime_metadata.*
+*anime_metadata.db*
 .env
 venv/

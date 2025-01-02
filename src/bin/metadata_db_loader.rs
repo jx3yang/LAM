@@ -1,5 +1,5 @@
 use lam::{downloader::Downloader, types::AnimeMetadata};
-use lam::db_loader::DbLoader;
+use lam::db_loader::{MetadataLoader, DbLoader};
 use lam::constants::DATABASE_URL;
 use sqlx::{migrate::MigrateDatabase, Connection, Error, Sqlite, SqliteConnection};
 use tokio::sync::mpsc;
@@ -17,14 +17,14 @@ async fn main() -> Result<(), Error> {
   let conn = SqliteConnection::connect(DATABASE_URL).await?;
   let (sender, receiver) = mpsc::channel::<Option<Vec<AnimeMetadata>>>(4);
   let mut downloader = Downloader::new(sender);
-  let mut db_loader = DbLoader::new(receiver, conn);
+  let mut db_loader = MetadataLoader::new(receiver, conn);
 
   let downloader_handle = task::spawn(async move {
     downloader.download().await
   });
 
   let loader_handle = task::spawn(async move {
-    db_loader.load().await
+    db_loader.start_load_job().await
   });
 
   let results = tokio::try_join!(
