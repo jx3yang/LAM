@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Title {
-    pub romaji: String,
+    pub romaji: Option<String>,
+    pub english: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]

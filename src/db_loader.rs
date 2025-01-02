@@ -41,7 +41,8 @@ impl DbLoader {
         let sql = "
             CREATE TABLE IF NOT EXISTS anime_metadata (
                 id INTEGER PRIMARY KEY,
-                title TEXT NOT NULL,
+                romaji_title TEXT,
+                english_title TEXT,
                 season TEXT,
                 season_year INTEGER NOT NULL,
                 description TEXT,
@@ -55,12 +56,13 @@ impl DbLoader {
 
     pub async fn load_metadata(conn: &mut SqliteConnection, media: Vec<AnimeMetadata>) -> Result<()> {
         let insert_sql = "
-            INSERT OR REPLACE INTO anime_metadata (id, title, season, season_year, description, popularity, mean_score)
+            INSERT OR REPLACE INTO anime_metadata (id, romaji_title, english_title, season, season_year, description, popularity, mean_score)
         ";
         let mut query = sqlx::QueryBuilder::new(insert_sql);
         query.push_values(media, |mut b, anime| {
             b.push_bind(anime.id)
                 .push_bind(anime.title.romaji.clone())
+                .push_bind(anime.title.english.clone())
                 .push_bind(anime.season.clone())
                 .push_bind(anime.season_year)
                 .push_bind(anime.description.clone())

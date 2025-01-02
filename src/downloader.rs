@@ -78,6 +78,7 @@ query (
       id
       title {
         romaji
+        english
       }
       season
       seasonYear
