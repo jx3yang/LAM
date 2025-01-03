@@ -48,7 +48,7 @@ impl Summarizer {
                                     let anime_id = anime.id;
                                     let response = Self::summarize_anime(&self.url, &self.api_key, anime).await.map(|response| Self::parse_response(response, anime_id));
                                     if response.is_err() {
-                                        println!("{:?}", response.unwrap_err());
+                                        println!("Summarize error: {:?}", response.unwrap_err());
                                         return;
                                     }
                                     let maybe_data = response.unwrap();
@@ -58,17 +58,17 @@ impl Summarizer {
                                     }
                                     let send_result = self.sender.send(maybe_data).await;
                                     if send_result.is_err() {
-                                        println!("{:?}", send_result.unwrap_err());
+                                        println!("Summary send error: {:?}", send_result.unwrap_err());
                                     }
                                 })
                                 .buffer_unordered(1)
                                 .collect::<Vec<_>>()
                                 .await;
-                            let _ = self.sender.send(None).await;
-                            println!("Finished sending anime summaries");
                         },
                         None => {
                             println!("Finished receiving metadata, ending summarizer job");
+                            let _ = self.sender.send(None).await;
+                            println!("Finished sending anime summaries");
                             return Ok(true);
                         },
                     }

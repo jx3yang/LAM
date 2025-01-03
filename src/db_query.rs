@@ -24,10 +24,13 @@ impl DbQuery {
         for year in years.min_year..years.max_year+1 {
             let rows = self.query_year(year).await.unwrap();
             println!("Year: {}, num rows: {}", year, rows.len());
+            if rows.is_empty() {
+                continue;
+            }
             let _ = self.sender.send(Some(rows)).await;
-            let _ = self.sender.send(None).await;
-            return Ok(true);
         }
+        let _ = self.sender.send(None).await;
+        println!("Finished sending metadata");
         Ok(true)
     }
 
