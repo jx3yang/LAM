@@ -2,3 +2,4 @@ target/
 *anime_metadata.db*
 .env
 venv/
+logs.txt

@@ -7,10 +7,10 @@ use crate::types::{AnimeMetadata, AnimeSummary};
 pub trait DbLoader<T> {
     fn loader_name(&mut self) -> String;
     fn get_conn(&mut self) -> &mut SqliteConnection;
-    fn get_receiver(&mut self) -> &mut mpsc::Receiver<Option<Vec<T>>>;
+    fn get_receiver(&mut self) -> &mut mpsc::Receiver<Option<T>>;
 
     async fn create_table_if_not_exists(conn: &mut SqliteConnection) -> Result<()>;
-    async fn load(conn: &mut SqliteConnection, data: Vec<T>) -> Result<()>;
+    async fn load(conn: &mut SqliteConnection, data: T) -> Result<()>;
 
     async fn start_load_job(&mut self) -> Result<bool> {
         Self::create_table_if_not_exists(self.get_conn()).await?;
@@ -20,9 +20,6 @@ pub trait DbLoader<T> {
                     println!("Loader {} has received data", self.loader_name());
                     match maybe_data {
                         Some(data) => {
-                            if data.is_empty() {
-                                continue;
-                            }
                             let response = Self::load(self.get_conn(), data).await;
                             if response.is_err() {
                                 println!("{:?}", response.unwrap_err());
@@ -38,7 +35,7 @@ pub trait DbLoader<T> {
 }
 
 pub struct SummaryLoader {
-    receiver: mpsc::Receiver<Option<Vec<AnimeSummary>>>,
+    receiver: mpsc::Receiver<Option<AnimeSummary>>,
     conn: SqliteConnection,
 }
 
@@ -51,7 +48,7 @@ impl DbLoader<AnimeSummary> for SummaryLoader {
         &mut self.conn
     }
 
-    fn get_receiver(&mut self) -> &mut mpsc::Receiver<Option<Vec<AnimeSummary>>> {
+    fn get_receiver(&mut self) -> &mut mpsc::Receiver<Option<AnimeSummary>> {
         &mut self.receiver
     }
 
@@ -68,12 +65,12 @@ impl DbLoader<AnimeSummary> for SummaryLoader {
         Ok(())
     }
 
-    async fn load(conn: &mut SqliteConnection, data: Vec<AnimeSummary>) -> Result<()> {
+    async fn load(conn: &mut SqliteConnection, data: AnimeSummary) -> Result<()> {
         let insert_sql = "
             INSERT OR REPLACE INTO anime_summary (id, summary, generated_genres, generated_themes)
         ";
         let mut query = sqlx::QueryBuilder::new(insert_sql);
-        query.push_values(data, |mut b, anime| {
+        query.push_values(vec![data], |mut b, anime| {
             b.push_bind(anime.id)
                 .push_bind(anime.generated_summary.summary)
                 .push_bind(anime.generated_summary.generated_genres.join(","))
@@ -88,7 +85,7 @@ impl DbLoader<AnimeSummary> for SummaryLoader {
 }
 
 impl SummaryLoader {
-    pub fn new(receiver: mpsc::Receiver<Option<Vec<AnimeSummary>>>, conn: SqliteConnection) -> Self {
+    pub fn new(receiver: mpsc::Receiver<Option<AnimeSummary>>, conn: SqliteConnection) -> Self {
         Self { receiver, conn }
     }
 }
@@ -98,7 +95,7 @@ pub struct MetadataLoader {
     conn: SqliteConnection,
 }
 
-impl DbLoader<AnimeMetadata> for MetadataLoader {
+impl DbLoader<Vec<AnimeMetadata>> for MetadataLoader {
     fn loader_name(&mut self) -> String {
         "MetadataLoader".to_string()
     }
@@ -130,6 +127,9 @@ impl DbLoader<AnimeMetadata> for MetadataLoader {
     }
 
     async fn load(conn: &mut SqliteConnection, data: Vec<AnimeMetadata>) -> Result<()> {
+        if data.is_empty() {
+            return Ok(());
+        }
         let insert_sql = "
             INSERT OR REPLACE INTO anime_metadata (id, romaji_title, english_title, season, season_year, description, popularity, mean_score, genres)
         ";

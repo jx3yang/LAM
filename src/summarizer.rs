@@ -37,29 +37,40 @@ impl Summarizer {
         loop {
             match self.receiver.recv().await {
                 Some(maybe_data) => {
-                    println!("Summarizer has received data");
                     match maybe_data {
                         Some(data) => {
+                            println!("Summarizer has received data");
                             if data.is_empty() {
                                 continue;
                             }
                             stream::iter(data)
                                 .map(|anime| async {
-                                    let response = Self::summarize_anime(&self.url, &self.api_key, anime).await.map(Self::parse_response);
+                                    let anime_id = anime.id;
+                                    let response = Self::summarize_anime(&self.url, &self.api_key, anime).await.map(|response| Self::parse_response(response, anime_id));
                                     if response.is_err() {
                                         println!("{:?}", response.unwrap_err());
                                         return;
                                     }
-                                    let send_result = self.sender.send(response.unwrap()).await;
+                                    let maybe_data = response.unwrap();
+                                    if maybe_data.is_none() {
+                                        println!("Got none after summarizing anime");
+                                        return;
+                                    }
+                                    let send_result = self.sender.send(maybe_data).await;
                                     if send_result.is_err() {
                                         println!("{:?}", send_result.unwrap_err());
                                     }
                                 })
-                                .buffer_unordered(10)
+                                .buffer_unordered(1)
                                 .collect::<Vec<_>>()
                                 .await;
+                            let _ = self.sender.send(None).await;
+                            println!("Finished sending anime summaries");
                         },
-                        None => return Ok(true),
+                        None => {
+                            println!("Finished receiving metadata, ending summarizer job");
+                            return Ok(true);
+                        },
                     }
                 },
                 None => return Ok(false),
@@ -138,8 +149,12 @@ impl Summarizer {
     }
 
     fn parse_response(
-        data: serde_json::Value
+        data: serde_json::Value,
+        anime_id: i32,
     ) -> Option<AnimeSummary> {
+        if data.is_null() {
+            return None;
+        }
         // println!("{:?}", data["choices"][0]["message"]["content"].as_str().clone());
         let anime_summary = match serde_json::from_str(data["choices"][0]["message"]["content"].as_str().clone().unwrap()) {
             Ok(summary) => Some(summary),
@@ -150,7 +165,7 @@ impl Summarizer {
         };
         anime_summary.map(|generated_summary| {
             AnimeSummary {
-                id: 0,
+                id: anime_id,
                 generated_summary: generated_summary
             }
         })
