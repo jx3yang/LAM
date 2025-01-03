@@ -75,9 +75,9 @@ impl DbLoader<AnimeSummary> for SummaryLoader {
         let mut query = sqlx::QueryBuilder::new(insert_sql);
         query.push_values(data, |mut b, anime| {
             b.push_bind(anime.id)
-                .push_bind(anime.summary)
-                .push_bind(anime.generated_genres.join(","))
-                .push_bind(anime.generated_themes.join(","));
+                .push_bind(anime.generated_summary.summary)
+                .push_bind(anime.generated_summary.generated_genres.join(","))
+                .push_bind(anime.generated_summary.generated_themes.join(","));
         });
         let built_query = query.build();
         // println!("{}", built_query.sql());

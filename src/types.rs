@@ -40,9 +40,16 @@ pub struct AnimeMetadataRow {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+pub struct AnimeGeneratedSummary {
+    pub summary: String,
+    #[serde(rename = "genres")]
+    pub generated_genres: Vec<String>,
+    #[serde(rename = "themes")]
+    pub generated_themes: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct AnimeSummary {
     pub id: i32,
-    pub summary: String,
-    pub generated_genres: Vec<String>,
-    pub generated_themes: Vec<String>,
+    pub generated_summary: AnimeGeneratedSummary
 }
