@@ -9,61 +9,66 @@ use futures::stream::{self, StreamExt};
 use crate::types::{AnimeMetadata, AnimeSummary};
 
 pub struct Summarizer {
-    receiver: mpsc::Receiver<Option<Vec<AnimeMetadata>>>,
+    receiver: mpsc::Receiver<Option<AnimeMetadata>>,
     sender: mpsc::Sender<Option<AnimeSummary>>,
+    ready_sender: mpsc::Sender<usize>,
+    idx: usize,
     url: String,
     api_key: String,
 }
 
 impl Summarizer {
     pub fn new(
-        receiver: mpsc::Receiver<Option<Vec<AnimeMetadata>>>,
+        receiver: mpsc::Receiver<Option<AnimeMetadata>>,
         sender: mpsc::Sender<Option<AnimeSummary>>,
+        ready_sender: mpsc::Sender<usize>,
+        idx: usize,
+        api_key: String,
     ) -> Self {
         let url = "https://api.groq.com/openai/v1/chat/completions";
-        let api_key = std::env::var("GROQ_API_KEY_LAM")
-            .expect("Environment variable GROQ_API_KEY must be set");
         Self {
             receiver,
             sender,
+            ready_sender,
+            idx,
             url: url.to_string(),
             api_key: api_key,
         }
     }
 
+    // Vec<Summarizer>
+    // Vec<Receiver>
+    // db_query has Vec<Sender>
+    // each summarizer sends (idx) -> db_query sends AnimeMetadata to senders[idx]
+
     pub async fn start_summarize_job(
         &mut self,
     ) -> Result<bool, Error> {
         loop {
+            let _ = self.ready_sender.send(self.idx).await;
+            println!("Summarizer {} is ready!", self.idx);
+
             match self.receiver.recv().await {
                 Some(maybe_data) => {
                     match maybe_data {
                         Some(data) => {
-                            println!("Summarizer has received data");
-                            if data.is_empty() {
+                            println!("Summarizer {} has received data", self.idx);
+                            // sleep(Duration::from_secs(((self.idx + 1) * 5).try_into().unwrap())).await;
+                            let anime_id = data.id;
+                            let response: Result<Option<AnimeSummary>, Error> = Self::summarize_anime(&self.url, &self.api_key, data).await.map(|response| Self::parse_response(response, anime_id));
+                            if response.is_err() {
+                                println!("Summarize error: {:?}", response.unwrap_err());
                                 continue;
                             }
-                            stream::iter(data)
-                                .map(|anime| async {
-                                    let anime_id = anime.id;
-                                    let response = Self::summarize_anime(&self.url, &self.api_key, anime).await.map(|response| Self::parse_response(response, anime_id));
-                                    if response.is_err() {
-                                        println!("Summarize error: {:?}", response.unwrap_err());
-                                        return;
-                                    }
-                                    let maybe_data = response.unwrap();
-                                    if maybe_data.is_none() {
-                                        println!("Got none after summarizing anime");
-                                        return;
-                                    }
-                                    let send_result = self.sender.send(maybe_data).await;
-                                    if send_result.is_err() {
-                                        println!("Summary send error: {:?}", send_result.unwrap_err());
-                                    }
-                                })
-                                .buffer_unordered(1)
-                                .collect::<Vec<_>>()
-                                .await;
+                            let maybe_data = response.unwrap();
+                            if maybe_data.is_none() {
+                                println!("Got none after summarizing anime");
+                                continue;
+                            }
+                            let send_result = self.sender.send(maybe_data).await;
+                            if send_result.is_err() {
+                                println!("Summary send error: {:?}", send_result.unwrap_err());
+                            }
                         },
                         None => {
                             println!("Finished receiving metadata, ending summarizer job");

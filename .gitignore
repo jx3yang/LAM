@@ -3,3 +3,4 @@ target/
 .env
 venv/
 logs.txt
+db_data/

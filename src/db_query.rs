@@ -10,13 +10,14 @@ struct Years {
 }
 
 pub struct DbQuery {
-    sender: mpsc::Sender<Option<Vec<AnimeMetadata>>>,
+    senders: Vec<mpsc::Sender<Option<AnimeMetadata>>>,
+    ready_receiver: mpsc::Receiver<usize>,
     conn: SqliteConnection,
 }
 
 impl DbQuery {
-    pub fn new(sender: mpsc::Sender<Option<Vec<AnimeMetadata>>>,conn: SqliteConnection) -> Self {
-        Self { sender, conn }
+    pub fn new(senders: Vec<mpsc::Sender<Option<AnimeMetadata>>>, ready_receiver: mpsc::Receiver<usize>, conn: SqliteConnection) -> Self {
+        Self { senders, ready_receiver, conn }
     }
 
     pub async fn query_all_years(&mut self) -> Result<bool> {
@@ -27,11 +28,29 @@ impl DbQuery {
             if rows.is_empty() {
                 continue;
             }
-            let _ = self.sender.send(Some(rows)).await;
+            self.handle_year(rows).await;
+            // let _ = self.sender.send(Some(rows)).await;
         }
-        let _ = self.sender.send(None).await;
+        // let _ = self.sender.send(None).await;
+        for idx in 0..self.senders.len() {
+            let _ = self.senders[idx].send(None).await;
+        }
         println!("Finished sending metadata");
         Ok(true)
+    }
+
+    async fn handle_year(&mut self, rows: Vec<AnimeMetadata>) {
+        for row in rows {
+            match self.ready_receiver.recv().await {
+                Some(idx) => {
+                    let response = self.senders[idx].send(Some(row)).await;
+                    if response.is_err() {
+                        println!("Error sending metadata to {}, err: {}", idx, response.unwrap_err());
+                    }
+                },
+                None => todo!(),
+            }
+        }
     }
 
     pub async fn query_year(&mut self, season_year: i32) -> Result<Vec<AnimeMetadata>> {
