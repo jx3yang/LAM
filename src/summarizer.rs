@@ -4,7 +4,6 @@ use reqwest::{Client, Error};
 use serde_json::json;
 use tokio::time::sleep;
 use tokio::sync::mpsc;
-use futures::stream::{self, StreamExt};
 
 use crate::types::{AnimeMetadata, AnimeSummary};
 
