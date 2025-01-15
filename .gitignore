@@ -4,3 +4,5 @@ target/
 venv/
 logs.txt
 db_data/
+embeddings.csv
+ids.txt
